@@ -1,0 +1,242 @@
+.wbwan-accordion {
+  --wbwan-border: #e3e3e3;
+  --wbwan-text: #1f1f1f;
+  --wbwan-muted: #6c6c6c;
+  --wbwan-bg: #fff;
+  position: relative;
+}
+
+.wbwan-panel {
+  border: 1px solid var(--wbwan-border);
+  background: var(--wbwan-bg);
+  padding: 14px;
+}
+
+.wbwan-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.wbwan-title {
+  color: var(--wbwan-text);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.wbwan-close {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.wbwan-search {
+  border: 1px solid var(--wbwan-border);
+  border-radius: 3px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.wbwan-section + .wbwan-section {
+  border-top: 1px solid var(--wbwan-border);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+.wbwan-section-title {
+  color: var(--wbwan-text);
+  font-size: .93rem;
+  margin: 0 0 8px;
+}
+
+.wbwan-list {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.wbwan-list .wbwan-list {
+  display: none;
+  margin-left: 18px;
+  padding-top: 6px;
+}
+
+.wbwan-item.is-open > .wbwan-list {
+  display: block;
+}
+
+.wbwan-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.wbwan-toggle,
+.wbwan-toggle-spacer {
+  flex: 0 0 18px;
+  height: 18px;
+  width: 18px;
+}
+
+.wbwan-toggle {
+  background: transparent;
+  border: 1px solid var(--wbwan-border);
+  border-radius: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.wbwan-toggle::before,
+.wbwan-toggle::after {
+  background: #555;
+  content: "";
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.wbwan-toggle::before {
+  height: 1px;
+  width: 9px;
+}
+
+.wbwan-toggle::after {
+  height: 9px;
+  width: 1px;
+}
+
+.wbwan-item.is-open > .wbwan-row .wbwan-toggle::after {
+  display: none;
+}
+
+.wbwan-row a {
+  color: var(--wbwan-text);
+  text-decoration: none;
+}
+
+.wbwan-row a:hover {
+  color: #111;
+  text-decoration: underline;
+}
+
+.wbwan-count {
+  color: var(--wbwan-muted);
+  font-size: .85em;
+}
+
+.wbwan-item.is-hidden {
+  display: none;
+}
+
+.wbwan-mobile-toggle {
+  display: none;
+}
+
+.wbwan-style-bold {
+  --wbwan-border: #141414;
+  --wbwan-text: #0f172a;
+  --wbwan-muted: #334155;
+  --wbwan-bg: #ffffff;
+}
+
+.wbwan-style-bold .wbwan-panel {
+  border-width: 2px;
+  border-radius: 12px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .08);
+}
+
+.wbwan-style-bold .wbwan-title {
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.wbwan-style-bold .wbwan-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.wbwan-style-bold .wbwan-toggle {
+  border-width: 2px;
+  border-radius: 5px;
+}
+
+.wbwan-style-bold .wbwan-search {
+  border-width: 2px;
+  border-radius: 8px;
+}
+
+.wbwan-style-glass {
+  --wbwan-border: rgba(255, 255, 255, .38);
+  --wbwan-text: #f8fafc;
+  --wbwan-muted: #e2e8f0;
+  --wbwan-bg: linear-gradient(145deg, rgba(30, 41, 59, .78), rgba(15, 23, 42, .82));
+}
+
+.wbwan-style-glass .wbwan-panel {
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  box-shadow: 0 16px 28px rgba(2, 6, 23, .28);
+}
+
+.wbwan-style-glass .wbwan-search {
+  background: rgba(255, 255, 255, .16);
+  border-color: rgba(255, 255, 255, .4);
+  color: #fff;
+}
+
+.wbwan-style-glass .wbwan-search::placeholder {
+  color: rgba(255, 255, 255, .85);
+}
+
+.wbwan-style-glass .wbwan-row a {
+  color: #f8fafc;
+}
+
+.wbwan-style-glass .wbwan-row a:hover {
+  color: #fff;
+}
+
+.wbwan-style-glass .wbwan-toggle {
+  border-color: rgba(255, 255, 255, .4);
+}
+
+.wbwan-style-glass .wbwan-toggle::before,
+.wbwan-style-glass .wbwan-toggle::after {
+  background: #f8fafc;
+}
+
+@media (max-width: 767px) {
+  .wbwan-accordion.is-mobile-offcanvas .wbwan-mobile-toggle {
+    background: #111;
+    border: 0;
+    color: #fff;
+    cursor: pointer;
+    display: inline-block;
+    font-size: .9rem;
+    margin-bottom: 10px;
+    padding: 8px 12px;
+  }
+
+  .wbwan-accordion.is-mobile-offcanvas .wbwan-panel {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .2);
+    left: 0;
+    max-width: 320px;
+    overflow-y: auto;
+    position: fixed;
+    top: 0;
+    transform: translateX(-105%);
+    transition: transform .2s ease;
+    z-index: 9999;
+    height: 100vh;
+  }
+
+  .wbwan-accordion.is-mobile-offcanvas.is-open .wbwan-panel {
+    transform: translateX(0);
+  }
+}
