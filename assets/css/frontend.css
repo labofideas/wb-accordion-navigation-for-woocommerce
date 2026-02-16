@@ -1,18 +1,18 @@
 .wbwan-accordion {
-  --wbwan-border: #d7dee8;
-  --wbwan-text: #12263a;
-  --wbwan-muted: #5f7086;
+  --wbwan-border: #dde4ee;
+  --wbwan-text: #1f2a37;
+  --wbwan-muted: #5c6b80;
   --wbwan-bg: #ffffff;
-  --wbwan-accent: #0f6fd8;
-  --wbwan-surface: #f4f7fb;
+  --wbwan-accent: #1d7af0;
+  --wbwan-surface: #f8fbff;
   --wbwan-radius: 16px;
-  --wbwan-shadow: 0 14px 34px rgba(18, 38, 58, 0.1);
+  --wbwan-shadow: 0 14px 34px rgba(23, 31, 56, 0.08);
   font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
   position: relative;
 }
 
 .wbwan-panel {
-  background: var(--wbwan-bg);
+  background: linear-gradient(165deg, #ffffff 0%, #f8fbff 100%);
   border: 1px solid var(--wbwan-border);
   border-radius: var(--wbwan-radius);
   box-shadow: var(--wbwan-shadow);
@@ -72,7 +72,7 @@
 }
 
 .wbwan-clear-filters {
-  background: linear-gradient(180deg, #ffffff, #f1f4f9);
+  background: linear-gradient(180deg, #ffffff, #eef4ff);
   border: 1px solid var(--wbwan-border);
   border-radius: 10px;
   color: var(--wbwan-text);
@@ -222,13 +222,13 @@
 }
 
 .wbwan-row a:hover {
-  background: #edf3fc;
-  color: #0b4f9d;
+  background: #eaf2ff;
+  color: #1d65c9;
 }
 
 .wbwan-row a.is-active {
-  background: #e6f0fd;
-  color: #0b61c2;
+  background: #deecff;
+  color: #1d7af0;
   font-weight: 700;
 }
 
@@ -264,13 +264,13 @@
 }
 
 .wbwan-style-bold {
-  --wbwan-border: #cdd8e6;
-  --wbwan-text: #10233a;
-  --wbwan-muted: #4f627a;
+  --wbwan-border: #ccd8e9;
+  --wbwan-text: #1c2938;
+  --wbwan-muted: #516178;
   --wbwan-bg: #ffffff;
-  --wbwan-accent: #135fb8;
+  --wbwan-accent: #1d7af0;
   --wbwan-surface: #f0f5fb;
-  --wbwan-shadow: 0 18px 36px rgba(7, 32, 66, 0.14);
+  --wbwan-shadow: 0 18px 36px rgba(23, 31, 56, 0.12);
 }
 
 .wbwan-style-bold .wbwan-panel {
@@ -336,8 +336,8 @@
 @media (max-width: 767px) {
   .wbwan-accordion.is-mobile-offcanvas .wbwan-mobile-toggle {
     align-items: center;
-    background: linear-gradient(180deg, #132238, #1e3653);
-    border: 1px solid rgba(19, 34, 56, 0.9);
+    background: linear-gradient(180deg, #1d7af0, #1266d3);
+    border: 1px solid #1260c4;
     border-radius: 10px;
     color: #fff;
     cursor: pointer;
