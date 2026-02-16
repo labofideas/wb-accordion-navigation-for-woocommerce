@@ -52,6 +52,41 @@
   padding: 6px 10px;
 }
 
+.wbwan-advanced-filters {
+  border: 1px dashed var(--wbwan-border);
+  border-radius: 6px;
+  margin: 0 0 12px;
+  padding: 10px;
+}
+
+.wbwan-price-range {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 8px;
+}
+
+.wbwan-price-range label span {
+  color: var(--wbwan-muted);
+  display: block;
+  font-size: .75rem;
+  margin-bottom: 4px;
+}
+
+.wbwan-price-range input {
+  border: 1px solid var(--wbwan-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+.wbwan-stock-toggle {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  font-size: .82rem;
+}
+
 .wbwan-section + .wbwan-section {
   border-top: 1px solid var(--wbwan-border);
   margin-top: 12px;

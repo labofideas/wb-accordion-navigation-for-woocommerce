@@ -211,6 +211,22 @@ class Frontend {
 				<?php endif; ?>
 				<?php if ( ! empty( $settings['enable_ajax_filtering'] ) ) : ?>
 					<button type="button" class="wbwan-clear-filters" data-wbwan="clear-filters"><?php esc_html_e( 'Clear Filters', 'wb-accordion-navigation-for-woocommerce' ); ?></button>
+					<div class="wbwan-advanced-filters" data-wbwan="advanced-filters">
+						<div class="wbwan-price-range">
+							<label>
+								<span><?php esc_html_e( 'Min Price', 'wb-accordion-navigation-for-woocommerce' ); ?></span>
+								<input type="number" min="0" step="1" data-wbwan="min-price" />
+							</label>
+							<label>
+								<span><?php esc_html_e( 'Max Price', 'wb-accordion-navigation-for-woocommerce' ); ?></span>
+								<input type="number" min="0" step="1" data-wbwan="max-price" />
+							</label>
+						</div>
+						<label class="wbwan-stock-toggle">
+							<input type="checkbox" data-wbwan="in-stock" />
+							<span><?php esc_html_e( 'In stock only', 'wb-accordion-navigation-for-woocommerce' ); ?></span>
+						</label>
+					</div>
 				<?php endif; ?>
 
 				<?php
@@ -588,6 +604,9 @@ class Frontend {
 		$tax_input = $request->get_param( 'tax' );
 		$collection = sanitize_key( (string) $request->get_param( 'collection' ) );
 		$paged = max( 1, absint( $request->get_param( 'paged' ) ) );
+		$min_price = max( 0, absint( $request->get_param( 'min_price' ) ) );
+		$max_price = max( 0, absint( $request->get_param( 'max_price' ) ) );
+		$in_stock_only = (bool) $request->get_param( 'in_stock' );
 
 		$args = array(
 			'post_type'      => 'product',
@@ -597,6 +616,7 @@ class Frontend {
 		);
 
 		$tax_query = array();
+		$meta_query = array();
 		if ( is_array( $tax_input ) ) {
 			foreach ( $tax_input as $taxonomy => $term_ids ) {
 				$taxonomy = sanitize_key( (string) $taxonomy );
@@ -620,6 +640,37 @@ class Frontend {
 			$args['tax_query'] = $tax_query;
 		}
 
+		if ( $min_price > 0 ) {
+			$meta_query[] = array(
+				'key'     => '_price', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional price filter.
+				'value'   => $min_price,
+				'compare' => '>=',
+				'type'    => 'NUMERIC',
+			);
+		}
+
+		if ( $max_price > 0 ) {
+			$meta_query[] = array(
+				'key'     => '_price', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional price filter.
+				'value'   => $max_price,
+				'compare' => '<=',
+				'type'    => 'NUMERIC',
+			);
+		}
+
+		if ( $in_stock_only ) {
+			$meta_query[] = array(
+				'key'     => '_stock_status', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional stock status filter.
+				'value'   => 'instock',
+				'compare' => '=',
+			);
+		}
+
+		if ( ! empty( $meta_query ) ) {
+			$meta_query['relation'] = 'AND';
+			$args['meta_query'] = $meta_query;
+		}
+
 		if ( '' !== $collection ) {
 			$args = array_merge( $args, $this->get_collection_query_args( $collection, $request ) );
 		}
@@ -638,10 +689,45 @@ class Frontend {
 		}
 		wp_reset_postdata();
 
+		$count_html = '';
+		if ( $query->found_posts > 0 ) {
+			$per_page = max( 1, (int) $args['posts_per_page'] );
+			$first = ( ( $paged - 1 ) * $per_page ) + 1;
+			$last = min( $query->found_posts, $paged * $per_page );
+			$count_html = '<p class="woocommerce-result-count">' .
+				esc_html(
+					sprintf(
+						/* translators: 1: first result, 2: last result, 3: total results */
+						__( 'Showing %1$d-%2$d of %3$d results', 'wb-accordion-navigation-for-woocommerce' ),
+						$first,
+						$last,
+						(int) $query->found_posts
+					)
+				) . '</p>';
+		}
+
+		$pagination_html = '';
+		if ( $query->max_num_pages > 1 ) {
+			$pagination_html .= '<nav class="woocommerce-pagination" aria-label="' . esc_attr__( 'Product Pagination', 'wb-accordion-navigation-for-woocommerce' ) . '"><ul class="page-numbers">';
+			for ( $i = 1; $i <= (int) $query->max_num_pages; $i++ ) {
+				$is_current = $i === $paged;
+				$pagination_html .= '<li>';
+				if ( $is_current ) {
+					$pagination_html .= '<span aria-current="page" class="page-numbers current">' . esc_html( (string) $i ) . '</span>';
+				} else {
+					$pagination_html .= '<a class="page-numbers" href="#" data-wbwan-page="' . esc_attr( (string) $i ) . '">' . esc_html( (string) $i ) . '</a>';
+				}
+				$pagination_html .= '</li>';
+			}
+			$pagination_html .= '</ul></nav>';
+		}
+
 		return new \WP_REST_Response(
 			array(
 				'html'       => (string) ob_get_clean(),
 				'foundPosts' => (int) $query->found_posts,
+				'countHtml'  => $count_html,
+				'paginationHtml' => $pagination_html,
 			)
 		);
 	}
