@@ -260,6 +260,7 @@ class Settings {
 			<?php elseif ( 'import_failed' === $notice ) : ?>
 				<div class="notice notice-error is-dismissible"><p><?php esc_html_e( 'Import failed. Please upload a valid settings JSON file.', 'wb-accordion-navigation-for-woocommerce' ); ?></p></div>
 			<?php endif; ?>
+			<?php settings_errors(); ?>
 
 			<div class="wbwan-admin-hero">
 				<div>

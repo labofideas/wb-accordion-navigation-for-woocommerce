@@ -41,6 +41,12 @@
   width: 100%;
 }
 
+.wbwan-search-empty {
+  color: var(--wbwan-muted);
+  font-size: .82rem;
+  margin: -6px 0 12px;
+}
+
 .wbwan-clear-filters {
   background: transparent;
   border: 1px solid var(--wbwan-border);
@@ -204,6 +210,10 @@
   display: none;
 }
 
+.wbwan-search-empty.is-hidden {
+  display: none;
+}
+
 .wbwan-clear-filters.is-hidden {
   display: none;
 }
@@ -214,6 +224,10 @@
 }
 
 .wbwan-mobile-toggle {
+  display: none;
+}
+
+.wbwan-accordion.is-mobile-offcanvas .wbwan-close {
   display: none;
 }
 
@@ -313,6 +327,10 @@
     transition: transform .2s ease;
     z-index: 9999;
     height: 100vh;
+  }
+
+  .wbwan-accordion.is-mobile-offcanvas .wbwan-close {
+    display: inline-block;
   }
 
   .wbwan-accordion.is-mobile-offcanvas.is-open .wbwan-panel {

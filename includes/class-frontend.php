@@ -221,6 +221,7 @@ class Frontend {
 
 				<?php if ( ! empty( $settings['enable_search'] ) ) : ?>
 					<input type="search" class="wbwan-search" data-wbwan="search" placeholder="<?php esc_attr_e( 'Search navigation...', 'wb-accordion-navigation-for-woocommerce' ); ?>" />
+					<p class="wbwan-search-empty is-hidden" data-wbwan="search-empty"><?php esc_html_e( 'No matching navigation items.', 'wb-accordion-navigation-for-woocommerce' ); ?></p>
 				<?php endif; ?>
 				<?php if ( ! empty( $settings['enable_ajax_filtering'] ) ) : ?>
 					<button type="button" class="wbwan-clear-filters" data-wbwan="clear-filters"><?php esc_html_e( 'Clear Filters', 'wb-accordion-navigation-for-woocommerce' ); ?></button>
@@ -326,9 +327,10 @@ class Frontend {
 	 * @param int $parent Parent term id.
 	 * @param array<string,mixed> $settings Settings.
 	 * @param array<int,int> $current_path Current path term IDs.
+	 * @param string         $list_id      Optional list id for aria-controls.
 	 * @return string
 	 */
-	private function render_hierarchical_terms( string $taxonomy, array $terms, int $parent, array $settings, array $current_path ): string {
+	private function render_hierarchical_terms( string $taxonomy, array $terms, int $parent, array $settings, array $current_path, string $list_id = '' ): string {
 		$children = array_values(
 			array_filter(
 				$terms,
@@ -341,7 +343,7 @@ class Frontend {
 		}
 
 		ob_start();
-		echo '<ul class="wbwan-list" data-wbwan="list">';
+		echo '<ul class="wbwan-list" data-wbwan="list"' . ( '' !== $list_id ? ' id="' . esc_attr( $list_id ) . '"' : '' ) . '>';
 		foreach ( $children as $term ) {
 			$term_children = array_values(
 				array_filter(
@@ -359,7 +361,8 @@ class Frontend {
 			echo '<li class="wbwan-item' . ( $has_children ? ' has-children' : '' ) . ( $is_open ? ' is-open' : '' ) . '" data-wbwan-term="' . esc_attr( (string) $term->term_id ) . '">';
 			echo '<div class="wbwan-row">';
 			if ( $has_children ) {
-				echo '<button type="button" class="wbwan-toggle" data-wbwan="toggle" aria-expanded="' . ( $is_open ? 'true' : 'false' ) . '" aria-label="' . esc_attr__( 'Toggle children', 'wb-accordion-navigation-for-woocommerce' ) . '"></button>';
+				$child_list_id = 'wbwan-list-' . sanitize_html_class( $taxonomy ) . '-' . (int) $term->term_id;
+				echo '<button type="button" class="wbwan-toggle" data-wbwan="toggle" aria-expanded="' . ( $is_open ? 'true' : 'false' ) . '" aria-controls="' . esc_attr( $child_list_id ) . '" aria-label="' . esc_attr( sprintf( __( 'Toggle children for %s', 'wb-accordion-navigation-for-woocommerce' ), $term->name ) ) . '"></button>';
 			} else {
 				echo '<span class="wbwan-toggle-spacer" aria-hidden="true"></span>';
 			}
@@ -372,7 +375,7 @@ class Frontend {
 			echo '</div>';
 
 			if ( $has_children ) {
-				echo $this->render_hierarchical_terms( $taxonomy, $terms, (int) $term->term_id, $settings, $current_path ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				echo $this->render_hierarchical_terms( $taxonomy, $terms, (int) $term->term_id, $settings, $current_path, $child_list_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			}
 
 			echo '</li>';
@@ -482,30 +485,32 @@ class Frontend {
 	 * Recursive menu branch render.
 	 *
 	 * @param array<int,array<int,\WP_Post>> $by_parent Parent map.
-	 * @param int $parent Parent item id.
+	 * @param int    $parent  Parent item id.
+	 * @param string $list_id Optional list id for aria-controls.
 	 * @return string
 	 */
-	private function render_menu_branch( array $by_parent, int $parent ): string {
+	private function render_menu_branch( array $by_parent, int $parent, string $list_id = '' ): string {
 		if ( empty( $by_parent[ $parent ] ) ) {
 			return '';
 		}
 
 		ob_start();
-		echo '<ul class="wbwan-list" data-wbwan="list">';
+		echo '<ul class="wbwan-list" data-wbwan="list"' . ( '' !== $list_id ? ' id="' . esc_attr( $list_id ) . '"' : '' ) . '>';
 		foreach ( $by_parent[ $parent ] as $item ) {
 			$item_id       = (int) $item->ID;
 			$has_children  = ! empty( $by_parent[ $item_id ] );
 			echo '<li class="wbwan-item' . ( $has_children ? ' has-children' : '' ) . '">';
 			echo '<div class="wbwan-row">';
 			if ( $has_children ) {
-				echo '<button type="button" class="wbwan-toggle" data-wbwan="toggle" aria-expanded="false" aria-label="' . esc_attr__( 'Toggle children', 'wb-accordion-navigation-for-woocommerce' ) . '"></button>';
+				$child_list_id = 'wbwan-menu-list-' . $item_id;
+				echo '<button type="button" class="wbwan-toggle" data-wbwan="toggle" aria-expanded="false" aria-controls="' . esc_attr( $child_list_id ) . '" aria-label="' . esc_attr( sprintf( __( 'Toggle children for %s', 'wb-accordion-navigation-for-woocommerce' ), $item->title ) ) . '"></button>';
 			} else {
 				echo '<span class="wbwan-toggle-spacer" aria-hidden="true"></span>';
 			}
 			echo '<a href="' . esc_url( $item->url ) . '">' . esc_html( $item->title ) . '</a>';
 			echo '</div>';
 			if ( $has_children ) {
-				echo $this->render_menu_branch( $by_parent, $item_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				echo $this->render_menu_branch( $by_parent, $item_id, $child_list_id ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			}
 			echo '</li>';
 		}
