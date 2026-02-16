@@ -4,8 +4,16 @@
   function initAccordion(root) {
     var storageKey = 'wbwan-open-state';
     var searchInput = root.querySelector('[data-wbwan="search"]');
+    var clearFiltersButton = root.querySelector('[data-wbwan="clear-filters"]');
     var toggles = root.querySelectorAll('[data-wbwan="toggle"]');
+    var filterLinks = root.querySelectorAll('[data-wbwan-filter-link="1"]');
+    var collectionLinks = root.querySelectorAll('[data-wbwan-collection-link="1"]');
+    var productsContainer = document.querySelector('.woocommerce ul.products, ul.products');
     var rememberState = typeof wbwanSettings !== 'undefined' && !!wbwanSettings.rememberState;
+    var ajaxEnabled = typeof wbwanSettings !== 'undefined' && !!wbwanSettings.ajaxFiltering && root.getAttribute('data-wbwan-ajax') === '1';
+    var restUrl = typeof wbwanSettings !== 'undefined' ? wbwanSettings.restUrl : '';
+    var activeTaxFilters = {};
+    var activeCollection = '';
 
     function persistState() {
       if (!rememberState || !window.localStorage) {
@@ -79,6 +87,71 @@
       });
     }
 
+    function buildQueryString() {
+      var params = new URLSearchParams();
+      Object.keys(activeTaxFilters).forEach(function (taxonomy) {
+        if (!Array.isArray(activeTaxFilters[taxonomy])) {
+          return;
+        }
+        activeTaxFilters[taxonomy].forEach(function (termId) {
+          params.append('tax[' + taxonomy + '][]', String(termId));
+        });
+      });
+      if (activeCollection) {
+        params.set('collection', activeCollection);
+      }
+      return params.toString();
+    }
+
+    function updateActiveUi() {
+      filterLinks.forEach(function (link) {
+        var taxonomy = link.getAttribute('data-wbwan-taxonomy');
+        var termId = parseInt(link.getAttribute('data-wbwan-term-id') || '0', 10);
+        var isActive = taxonomy && Array.isArray(activeTaxFilters[taxonomy]) && activeTaxFilters[taxonomy].indexOf(termId) !== -1;
+        link.classList.toggle('is-active', !!isActive);
+      });
+
+      collectionLinks.forEach(function (link) {
+        var collection = link.getAttribute('data-wbwan-collection');
+        link.classList.toggle('is-active', !!collection && collection === activeCollection);
+      });
+
+      if (clearFiltersButton) {
+        var hasTaxFilter = Object.keys(activeTaxFilters).some(function (taxonomy) {
+          return Array.isArray(activeTaxFilters[taxonomy]) && activeTaxFilters[taxonomy].length > 0;
+        });
+        clearFiltersButton.classList.toggle('is-hidden', !hasTaxFilter && !activeCollection);
+      }
+    }
+
+    function fetchFilteredProducts() {
+      if (!ajaxEnabled || !restUrl || !productsContainer) {
+        return;
+      }
+
+      var query = buildQueryString();
+      var url = restUrl + (query ? '?' + query : '');
+      root.classList.add('is-loading');
+
+      window.fetch(url, { credentials: 'same-origin' })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (payload) {
+          if (!payload || typeof payload.html !== 'string') {
+            return;
+          }
+          productsContainer.outerHTML = payload.html;
+          productsContainer = document.querySelector('.woocommerce ul.products, ul.products');
+        })
+        .catch(function () {
+          // Silently ignore AJAX errors and keep current product list.
+        })
+        .finally(function () {
+          root.classList.remove('is-loading');
+        });
+    }
+
     var mobileToggle = root.querySelector('[data-wbwan="mobile-toggle"]');
     var mobileClose = root.querySelector('[data-wbwan="mobile-close"]');
 
@@ -92,6 +165,57 @@
       mobileClose.addEventListener('click', function () {
         root.classList.remove('is-open');
       });
+    }
+
+    if (ajaxEnabled) {
+      filterLinks.forEach(function (link) {
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          var taxonomy = link.getAttribute('data-wbwan-taxonomy');
+          var termId = parseInt(link.getAttribute('data-wbwan-term-id') || '0', 10);
+          if (!taxonomy || !termId) {
+            return;
+          }
+
+          if (!Array.isArray(activeTaxFilters[taxonomy])) {
+            activeTaxFilters[taxonomy] = [];
+          }
+
+          var index = activeTaxFilters[taxonomy].indexOf(termId);
+          if (index === -1) {
+            activeTaxFilters[taxonomy].push(termId);
+          } else {
+            activeTaxFilters[taxonomy].splice(index, 1);
+            if (activeTaxFilters[taxonomy].length === 0) {
+              delete activeTaxFilters[taxonomy];
+            }
+          }
+
+          updateActiveUi();
+          fetchFilteredProducts();
+        });
+      });
+
+      collectionLinks.forEach(function (link) {
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          var collection = link.getAttribute('data-wbwan-collection') || '';
+          activeCollection = activeCollection === collection ? '' : collection;
+          updateActiveUi();
+          fetchFilteredProducts();
+        });
+      });
+
+      if (clearFiltersButton) {
+        clearFiltersButton.addEventListener('click', function () {
+          activeTaxFilters = {};
+          activeCollection = '';
+          updateActiveUi();
+          fetchFilteredProducts();
+        });
+      }
+
+      updateActiveUi();
     }
   }
 

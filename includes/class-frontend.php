@@ -34,14 +34,19 @@ class Frontend {
 		add_filter( 'query_vars', array( $this, 'register_query_vars' ) );
 		add_action( 'pre_get_posts', array( $this, 'apply_collection_query' ) );
 		add_action( 'woocommerce_sidebar', array( $this, 'maybe_inject_into_sidebar' ), 5 );
+		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 	}
 
 	/**
 	 * Register assets.
 	 */
 	public function register_assets(): void {
-		wp_register_style( 'wbwan-frontend', WBWAN_URL . 'assets/css/frontend.css', array(), WBWAN_VERSION );
-		wp_register_script( 'wbwan-frontend', WBWAN_URL . 'assets/js/frontend.js', array(), WBWAN_VERSION, true );
+		$style_path = WBWAN_PATH . 'assets/css/frontend.css';
+		$script_path = WBWAN_PATH . 'assets/js/frontend.js';
+		$style_version = file_exists( $style_path ) ? (string) filemtime( $style_path ) : WBWAN_VERSION;
+		$script_version = file_exists( $script_path ) ? (string) filemtime( $script_path ) : WBWAN_VERSION;
+		wp_register_style( 'wbwan-frontend', WBWAN_URL . 'assets/css/frontend.css', array(), $style_version );
+		wp_register_script( 'wbwan-frontend', WBWAN_URL . 'assets/js/frontend.js', array(), $script_version, true );
 	}
 
 	/**
@@ -53,6 +58,21 @@ class Frontend {
 	public function register_query_vars( array $vars ): array {
 		$vars[] = 'wban_collection';
 		return $vars;
+	}
+
+	/**
+	 * Register REST routes.
+	 */
+	public function register_rest_routes(): void {
+		register_rest_route(
+			'wbwan/v1',
+			'/filter',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'handle_filter_request' ),
+			)
+		);
 	}
 
 	/**
@@ -119,43 +139,7 @@ class Frontend {
 			return;
 		}
 
-		$collection_args = array();
-
-		switch ( $collection ) {
-			case 'best_sellers':
-				$collection_args = array(
-					// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Intentional WooCommerce catalog ordering by sales meta.
-					'meta_key' => 'total_sales',
-					'orderby'  => 'meta_value_num',
-					'order'    => 'DESC',
-				);
-				break;
-
-			case 'on_sale':
-				$on_sale_ids = function_exists( 'wc_get_product_ids_on_sale' ) ? wc_get_product_ids_on_sale() : array();
-				$collection_args = array(
-					'post__in' => ! empty( $on_sale_ids ) ? $on_sale_ids : array( 0 ),
-				);
-				break;
-
-			case 'top_rated':
-				$collection_args = array(
-					// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Intentional WooCommerce catalog ordering by rating meta.
-					'meta_key' => '_wc_average_rating',
-					'orderby'  => 'meta_value_num',
-					'order'    => 'DESC',
-				);
-				break;
-
-			case 'new_arrivals':
-				$collection_args = array(
-					'orderby' => 'date',
-					'order'   => 'DESC',
-				);
-				break;
-		}
-
-		$collection_args = apply_filters( 'wbwan_collection_query_args', $collection_args, $collection, $query );
+		$collection_args = $this->get_collection_query_args( $collection, $query );
 		if ( ! is_array( $collection_args ) ) {
 			return;
 		}
@@ -191,6 +175,8 @@ class Frontend {
 			'wbwanSettings',
 			array(
 				'rememberState' => ! empty( $settings['remember_state'] ),
+				'ajaxFiltering' => ! empty( $settings['enable_ajax_filtering'] ),
+				'restUrl'       => esc_url_raw( rest_url( 'wbwan/v1/filter' ) ),
 			)
 		);
 
@@ -206,7 +192,7 @@ class Frontend {
 
 		ob_start();
 		?>
-		<div class="<?php echo esc_attr( implode( ' ', $wrapper_classes ) ); ?>" data-wbwan="accordion">
+		<div class="<?php echo esc_attr( implode( ' ', $wrapper_classes ) ); ?>" data-wbwan="accordion" data-wbwan-ajax="<?php echo ! empty( $settings['enable_ajax_filtering'] ) ? '1' : '0'; ?>">
 			<?php do_action( 'wbwan_before_render', $settings ); ?>
 			<?php if ( ! empty( $settings['mobile_offcanvas'] ) ) : ?>
 				<button class="wbwan-mobile-toggle" type="button" data-wbwan="mobile-toggle"><?php esc_html_e( 'Filters', 'wb-accordion-navigation-for-woocommerce' ); ?></button>
@@ -222,6 +208,9 @@ class Frontend {
 
 				<?php if ( ! empty( $settings['enable_search'] ) ) : ?>
 					<input type="search" class="wbwan-search" data-wbwan="search" placeholder="<?php esc_attr_e( 'Search navigation...', 'wb-accordion-navigation-for-woocommerce' ); ?>" />
+				<?php endif; ?>
+				<?php if ( ! empty( $settings['enable_ajax_filtering'] ) ) : ?>
+					<button type="button" class="wbwan-clear-filters" data-wbwan="clear-filters"><?php esc_html_e( 'Clear Filters', 'wb-accordion-navigation-for-woocommerce' ); ?></button>
 				<?php endif; ?>
 
 				<?php
@@ -333,7 +322,7 @@ class Frontend {
 				echo '<span class="wbwan-toggle-spacer" aria-hidden="true"></span>';
 			}
 
-			echo '<a href="' . esc_url( $term_link ) . '">' . esc_html( $term->name );
+			echo '<a href="' . esc_url( $term_link ) . '" data-wbwan-filter-link="1" data-wbwan-taxonomy="' . esc_attr( $taxonomy ) . '" data-wbwan-term-id="' . esc_attr( (string) $term->term_id ) . '">' . esc_html( $term->name );
 			if ( ! empty( $settings['show_counts'] ) ) {
 				echo ' <span class="wbwan-count">(' . esc_html( (string) $term->count ) . ')</span>';
 			}
@@ -366,7 +355,7 @@ class Frontend {
 				continue;
 			}
 
-			echo '<li class="wbwan-item"><div class="wbwan-row"><span class="wbwan-toggle-spacer" aria-hidden="true"></span><a href="' . esc_url( $term_link ) . '">' . esc_html( $term->name );
+			echo '<li class="wbwan-item"><div class="wbwan-row"><span class="wbwan-toggle-spacer" aria-hidden="true"></span><a href="' . esc_url( $term_link ) . '" data-wbwan-filter-link="1" data-wbwan-taxonomy="' . esc_attr( $term->taxonomy ) . '" data-wbwan-term-id="' . esc_attr( (string) $term->term_id ) . '">' . esc_html( $term->name );
 			if ( ! empty( $settings['show_counts'] ) ) {
 				echo ' <span class="wbwan-count">(' . esc_html( (string) $term->count ) . ')</span>';
 			}
@@ -405,7 +394,7 @@ class Frontend {
 					<li class="wbwan-item">
 						<div class="wbwan-row">
 							<span class="wbwan-toggle-spacer" aria-hidden="true"></span>
-							<a href="<?php echo esc_url( $link ); ?>"><?php echo esc_html( $collections_map[ $collection ] ); ?></a>
+							<a href="<?php echo esc_url( $link ); ?>" data-wbwan-collection-link="1" data-wbwan-collection="<?php echo esc_attr( $collection ); ?>"><?php echo esc_html( $collections_map[ $collection ] ); ?></a>
 						</div>
 					</li>
 				<?php endforeach; ?>
@@ -544,5 +533,116 @@ class Frontend {
 		}
 
 		return $path;
+	}
+
+	/**
+	 * Build collection query args map.
+	 *
+	 * @param string                 $collection Collection key.
+	 * @param \WP_Query|\WP_REST_Request $context Query context.
+	 * @return array<string,mixed>
+	 */
+	private function get_collection_query_args( string $collection, $context ): array {
+		$collection_args = array();
+		switch ( $collection ) {
+			case 'best_sellers':
+				$collection_args = array(
+					// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Intentional WooCommerce catalog ordering by sales meta.
+					'meta_key' => 'total_sales',
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+				break;
+			case 'on_sale':
+				$on_sale_ids = function_exists( 'wc_get_product_ids_on_sale' ) ? wc_get_product_ids_on_sale() : array();
+				$collection_args = array(
+					'post__in' => ! empty( $on_sale_ids ) ? $on_sale_ids : array( 0 ),
+				);
+				break;
+			case 'top_rated':
+				$collection_args = array(
+					// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Intentional WooCommerce catalog ordering by rating meta.
+					'meta_key' => '_wc_average_rating',
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+				break;
+			case 'new_arrivals':
+				$collection_args = array(
+					'orderby' => 'date',
+					'order'   => 'DESC',
+				);
+				break;
+		}
+
+		return (array) apply_filters( 'wbwan_collection_query_args', $collection_args, $collection, $context );
+	}
+
+	/**
+	 * REST filter endpoint callback.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function handle_filter_request( \WP_REST_Request $request ): \WP_REST_Response {
+		$tax_input = $request->get_param( 'tax' );
+		$collection = sanitize_key( (string) $request->get_param( 'collection' ) );
+		$paged = max( 1, absint( $request->get_param( 'paged' ) ) );
+
+		$args = array(
+			'post_type'      => 'product',
+			'post_status'    => 'publish',
+			'paged'          => $paged,
+			'posts_per_page' => (int) get_option( 'posts_per_page', 12 ),
+		);
+
+		$tax_query = array();
+		if ( is_array( $tax_input ) ) {
+			foreach ( $tax_input as $taxonomy => $term_ids ) {
+				$taxonomy = sanitize_key( (string) $taxonomy );
+				if ( ! taxonomy_exists( $taxonomy ) || ! is_array( $term_ids ) ) {
+					continue;
+				}
+				$ids = array_values( array_filter( array_map( 'absint', $term_ids ) ) );
+				if ( empty( $ids ) ) {
+					continue;
+				}
+				$tax_query[] = array(
+					'taxonomy' => $taxonomy,
+					'field'    => 'term_id',
+					'terms'    => $ids,
+					'operator' => 'IN',
+				);
+			}
+		}
+		if ( ! empty( $tax_query ) ) {
+			$tax_query['relation'] = 'AND';
+			$args['tax_query'] = $tax_query;
+		}
+
+		if ( '' !== $collection ) {
+			$args = array_merge( $args, $this->get_collection_query_args( $collection, $request ) );
+		}
+
+		$query = new \WP_Query( $args );
+		ob_start();
+		if ( $query->have_posts() ) {
+			woocommerce_product_loop_start();
+			while ( $query->have_posts() ) {
+				$query->the_post();
+				wc_get_template_part( 'content', 'product' );
+			}
+			woocommerce_product_loop_end();
+		} else {
+			echo '<p class="woocommerce-info">' . esc_html__( 'No products found.', 'wb-accordion-navigation-for-woocommerce' ) . '</p>';
+		}
+		wp_reset_postdata();
+
+		return new \WP_REST_Response(
+			array(
+				'html'       => (string) ob_get_clean(),
+				'foundPosts' => (int) $query->found_posts,
+			)
+		);
 	}
 }

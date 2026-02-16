@@ -41,6 +41,17 @@
   width: 100%;
 }
 
+.wbwan-clear-filters {
+  background: transparent;
+  border: 1px solid var(--wbwan-border);
+  border-radius: 4px;
+  color: var(--wbwan-text);
+  cursor: pointer;
+  font-size: .8rem;
+  margin: 0 0 12px;
+  padding: 6px 10px;
+}
+
 .wbwan-section + .wbwan-section {
   border-top: 1px solid var(--wbwan-border);
   margin-top: 12px;
@@ -125,6 +136,11 @@
   text-decoration: underline;
 }
 
+.wbwan-row a.is-active {
+  color: #0b63d1;
+  font-weight: 600;
+}
+
 .wbwan-count {
   color: var(--wbwan-muted);
   font-size: .85em;
@@ -132,6 +148,15 @@
 
 .wbwan-item.is-hidden {
   display: none;
+}
+
+.wbwan-clear-filters.is-hidden {
+  display: none;
+}
+
+.wbwan-accordion.is-loading .wbwan-panel {
+  opacity: .55;
+  pointer-events: none;
 }
 
 .wbwan-mobile-toggle {

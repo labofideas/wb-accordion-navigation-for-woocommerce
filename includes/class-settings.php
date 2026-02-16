@@ -73,6 +73,7 @@ class Settings {
 			'enable_search'       => 1,
 			'remember_state'      => 1,
 			'mobile_offcanvas'    => 1,
+			'enable_ajax_filtering' => 0,
 			'inject_shop_sidebar' => 0,
 			'cache_ttl'           => 15,
 			'menu_id'             => 0,
@@ -224,7 +225,7 @@ class Settings {
 			$clean['style_preset'] = (string) $defaults['style_preset'];
 		}
 
-		foreach ( array( 'show_counts', 'hide_empty', 'auto_expand_current', 'enable_search', 'remember_state', 'mobile_offcanvas', 'inject_shop_sidebar' ) as $bool_key ) {
+		foreach ( array( 'show_counts', 'hide_empty', 'auto_expand_current', 'enable_search', 'remember_state', 'mobile_offcanvas', 'enable_ajax_filtering', 'inject_shop_sidebar' ) as $bool_key ) {
 			$clean[ $bool_key ] = isset( $input[ $bool_key ] ) ? 1 : 0;
 		}
 
@@ -316,10 +317,11 @@ class Settings {
 						$this->render_modern_toggle( 'show_counts', __( 'Show product counts', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 						$this->render_modern_toggle( 'hide_empty', __( 'Hide empty terms', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 						$this->render_modern_toggle( 'auto_expand_current', __( 'Auto-expand current term path', 'wb-accordion-navigation-for-woocommerce' ), $settings );
-						$this->render_modern_toggle( 'enable_search', __( 'Enable search within accordion', 'wb-accordion-navigation-for-woocommerce' ), $settings );
-						$this->render_modern_toggle( 'remember_state', __( 'Remember open accordion state', 'wb-accordion-navigation-for-woocommerce' ), $settings );
-						$this->render_modern_toggle( 'mobile_offcanvas', __( 'Enable mobile off-canvas mode', 'wb-accordion-navigation-for-woocommerce' ), $settings );
-						?>
+							$this->render_modern_toggle( 'enable_search', __( 'Enable search within accordion', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'remember_state', __( 'Remember open accordion state', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'mobile_offcanvas', __( 'Enable mobile off-canvas mode', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'enable_ajax_filtering', __( 'Enable AJAX filtering mode (shop/product archives)', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							?>
 					</div>
 
 						<div class="wbwan-card">
