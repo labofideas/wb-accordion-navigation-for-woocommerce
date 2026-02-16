@@ -11,17 +11,21 @@
     var minPriceInput = root.querySelector('[data-wbwan="min-price"]');
     var maxPriceInput = root.querySelector('[data-wbwan="max-price"]');
     var inStockInput = root.querySelector('[data-wbwan="in-stock"]');
+    var sortInput = root.querySelector('[data-wbwan="sort"]');
     var productsContainer = document.querySelector('.woocommerce ul.products, ul.products');
     var config = (typeof window !== 'undefined' && window.wbwanSettings) ? window.wbwanSettings : {};
     var rememberState = !!config.rememberState;
     var ajaxEnabled = root.getAttribute('data-wbwan-ajax') === '1';
     var restUrl = config.restUrl || (window.location.origin + '/wp-json/wbwan/v1/filter');
+    var analyticsEnabled = !!config.analyticsEnabled;
+    var analyticsUrl = config.analyticsUrl || (window.location.origin + '/wp-json/wbwan/v1/analytics');
     var activeTaxFilters = {};
     var activeCollection = '';
     var activePage = 1;
     var minPrice = '';
     var maxPrice = '';
     var inStockOnly = false;
+    var activeSort = 'default';
     var debounceTimer = null;
 
     function parseHtml(html) {
@@ -45,6 +49,7 @@
       minPrice = params.get('wbf_min_price') || '';
       maxPrice = params.get('wbf_max_price') || '';
       inStockOnly = params.get('wbf_in_stock') === '1';
+      activeSort = params.get('wbf_sort') || 'default';
 
       params.forEach(function (value, key) {
         if (key.indexOf('wbf_tax_') !== 0) {
@@ -158,6 +163,9 @@
       if (inStockOnly) {
         params.set('in_stock', '1');
       }
+      if (activeSort && activeSort !== 'default') {
+        params.set('sort', activeSort);
+      }
       return params.toString();
     }
 
@@ -191,6 +199,9 @@
       }
       if (inStockOnly) {
         params.set('wbf_in_stock', '1');
+      }
+      if (activeSort && activeSort !== 'default') {
+        params.set('wbf_sort', activeSort);
       }
 
       var nextUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
@@ -226,6 +237,9 @@
       }
       if (inStockInput) {
         inStockInput.checked = inStockOnly;
+      }
+      if (sortInput) {
+        sortInput.value = activeSort || 'default';
       }
     }
 
@@ -265,6 +279,29 @@
       }
     }
 
+    function trackAnalytics(foundPosts) {
+      if (!analyticsEnabled || !analyticsUrl) {
+        return;
+      }
+
+      window.fetch(analyticsUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          taxFilters: activeTaxFilters,
+          collection: activeCollection,
+          sort: activeSort,
+          foundPosts: Number(foundPosts || 0),
+          inStockOnly: inStockOnly
+        })
+      }).catch(function () {
+        // Analytics is best-effort only.
+      });
+    }
+
     function fetchFilteredProducts() {
       if (!ajaxEnabled || !restUrl || !productsContainer) {
         return;
@@ -285,6 +322,7 @@
           productsContainer.outerHTML = payload.html;
           productsContainer = document.querySelector('.woocommerce ul.products, ul.products');
           updateResultFragments(payload);
+          trackAnalytics(payload.foundPosts);
         })
         .catch(function () {
           // Silently ignore AJAX errors and keep current product list.
@@ -368,6 +406,7 @@
           minPrice = '';
           maxPrice = '';
           inStockOnly = false;
+          activeSort = 'default';
           activePage = 1;
           updateActiveUi();
           scheduleFetch();
@@ -393,6 +432,14 @@
       if (inStockInput) {
         inStockInput.addEventListener('change', function () {
           inStockOnly = !!inStockInput.checked;
+          activePage = 1;
+          scheduleFetch();
+        });
+      }
+
+      if (sortInput) {
+        sortInput.addEventListener('change', function () {
+          activeSort = (sortInput.value || 'default').trim();
           activePage = 1;
           scheduleFetch();
         });

@@ -87,6 +87,25 @@
   font-size: .82rem;
 }
 
+.wbwan-sort-control {
+  display: block;
+  margin-top: 10px;
+}
+
+.wbwan-sort-control span {
+  color: var(--wbwan-muted);
+  display: block;
+  font-size: .75rem;
+  margin-bottom: 4px;
+}
+
+.wbwan-sort-control select {
+  border: 1px solid var(--wbwan-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
 .wbwan-section + .wbwan-section {
   border-top: 1px solid var(--wbwan-border);
   margin-top: 12px;

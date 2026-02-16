@@ -1,0 +1,13 @@
+{
+  "name": "wb-accordion-navigation-for-woocommerce",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright regression tests and packaging scripts for WB Accordion Navigation for WooCommerce.",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "package:zip": "rm -f /tmp/wb-accordion-navigation-for-woocommerce-1.0.0.zip && cd .. && zip -r /tmp/wb-accordion-navigation-for-woocommerce-1.0.0.zip wb-accordion-navigation-for-woocommerce -x 'wb-accordion-navigation-for-woocommerce/node_modules/*' 'wb-accordion-navigation-for-woocommerce/tests/*' 'wb-accordion-navigation-for-woocommerce/.git/*' 'wb-accordion-navigation-for-woocommerce/playwright-report/*' 'wb-accordion-navigation-for-woocommerce/test-results/*'"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
+}

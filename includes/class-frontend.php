@@ -73,6 +73,16 @@ class Frontend {
 				'callback'            => array( $this, 'handle_filter_request' ),
 			)
 		);
+
+		register_rest_route(
+			'wbwan/v1',
+			'/analytics',
+			array(
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'permission_callback' => '__return_true',
+				'callback'            => array( $this, 'handle_analytics_request' ),
+			)
+		);
 	}
 
 	/**
@@ -176,7 +186,10 @@ class Frontend {
 			array(
 				'rememberState' => ! empty( $settings['remember_state'] ),
 				'ajaxFiltering' => ! empty( $settings['enable_ajax_filtering'] ),
+				'ajaxSorting'   => ! empty( $settings['enable_ajax_sorting'] ),
+				'analyticsEnabled' => ! empty( $settings['enable_filter_analytics'] ),
 				'restUrl'       => esc_url_raw( rest_url( 'wbwan/v1/filter' ) ),
+				'analyticsUrl'  => esc_url_raw( rest_url( 'wbwan/v1/analytics' ) ),
 			)
 		);
 
@@ -226,6 +239,19 @@ class Frontend {
 							<input type="checkbox" data-wbwan="in-stock" />
 							<span><?php esc_html_e( 'In stock only', 'wb-accordion-navigation-for-woocommerce' ); ?></span>
 						</label>
+						<?php if ( ! empty( $settings['enable_ajax_sorting'] ) ) : ?>
+							<label class="wbwan-sort-control">
+								<span><?php esc_html_e( 'Sort by', 'wb-accordion-navigation-for-woocommerce' ); ?></span>
+								<select data-wbwan="sort">
+									<option value="default"><?php esc_html_e( 'Default', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+									<option value="date_desc"><?php esc_html_e( 'Newest', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+									<option value="price_asc"><?php esc_html_e( 'Price: Low to High', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+									<option value="price_desc"><?php esc_html_e( 'Price: High to Low', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+									<option value="popularity"><?php esc_html_e( 'Popularity', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+									<option value="rating"><?php esc_html_e( 'Top Rated', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+								</select>
+							</label>
+						<?php endif; ?>
 					</div>
 				<?php endif; ?>
 
@@ -607,6 +633,12 @@ class Frontend {
 		$min_price = max( 0, absint( $request->get_param( 'min_price' ) ) );
 		$max_price = max( 0, absint( $request->get_param( 'max_price' ) ) );
 		$in_stock_only = (bool) $request->get_param( 'in_stock' );
+		$sort = sanitize_key( (string) $request->get_param( 'sort' ) );
+		$settings = Settings::get();
+		$filter_logic = isset( $settings['filter_logic'] ) ? sanitize_key( (string) $settings['filter_logic'] ) : 'and';
+		if ( ! in_array( $filter_logic, array( 'and', 'or' ), true ) ) {
+			$filter_logic = 'and';
+		}
 
 		$args = array(
 			'post_type'      => 'product',
@@ -636,7 +668,7 @@ class Frontend {
 			}
 		}
 		if ( ! empty( $tax_query ) ) {
-			$tax_query['relation'] = 'AND';
+			$tax_query['relation'] = 'or' === $filter_logic ? 'OR' : 'AND';
 			$args['tax_query'] = $tax_query;
 		}
 
@@ -673,6 +705,11 @@ class Frontend {
 
 		if ( '' !== $collection ) {
 			$args = array_merge( $args, $this->get_collection_query_args( $collection, $request ) );
+		}
+
+		$sort_args = $this->get_sort_query_args( $sort );
+		if ( ! empty( $sort_args ) ) {
+			$args = array_merge( $args, $sort_args );
 		}
 
 		$query = new \WP_Query( $args );
@@ -728,7 +765,128 @@ class Frontend {
 				'foundPosts' => (int) $query->found_posts,
 				'countHtml'  => $count_html,
 				'paginationHtml' => $pagination_html,
+				'sort'       => $sort,
 			)
 		);
+	}
+
+	/**
+	 * Map sort key to query args.
+	 *
+	 * @param string $sort Sort key.
+	 * @return array<string,mixed>
+	 */
+	private function get_sort_query_args( string $sort ): array {
+		switch ( $sort ) {
+			case 'date_desc':
+				return array(
+					'orderby' => 'date',
+					'order'   => 'DESC',
+				);
+			case 'price_asc':
+				return array(
+					'meta_key' => '_price', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
+					'orderby'  => 'meta_value_num',
+					'order'    => 'ASC',
+				);
+			case 'price_desc':
+				return array(
+					'meta_key' => '_price', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+			case 'popularity':
+				return array(
+					'meta_key' => 'total_sales', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+			case 'rating':
+				return array(
+					'meta_key' => '_wc_average_rating', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
+					'orderby'  => 'meta_value_num',
+					'order'    => 'DESC',
+				);
+		}
+
+		return array();
+	}
+
+	/**
+	 * Track filtering analytics payload.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function handle_analytics_request( \WP_REST_Request $request ): \WP_REST_Response {
+		$settings = Settings::get();
+		if ( empty( $settings['enable_filter_analytics'] ) ) {
+			return new \WP_REST_Response( array( 'tracked' => false ) );
+		}
+
+		$payload = $request->get_json_params();
+		if ( ! is_array( $payload ) ) {
+			$payload = array();
+		}
+
+		$option = get_option( 'wbwan_filter_analytics', array() );
+		$analytics = is_array( $option ) ? $option : array();
+		$analytics['events'] = isset( $analytics['events'] ) ? absint( $analytics['events'] ) + 1 : 1;
+		$analytics['last_updated'] = gmdate( 'c' );
+
+		$analytics['collections'] = isset( $analytics['collections'] ) && is_array( $analytics['collections'] ) ? $analytics['collections'] : array();
+		$collection = isset( $payload['collection'] ) ? sanitize_key( (string) $payload['collection'] ) : '';
+		if ( '' !== $collection ) {
+			$analytics['collections'][ $collection ] = isset( $analytics['collections'][ $collection ] ) ? absint( $analytics['collections'][ $collection ] ) + 1 : 1;
+		}
+
+		$analytics['sorts'] = isset( $analytics['sorts'] ) && is_array( $analytics['sorts'] ) ? $analytics['sorts'] : array();
+		$sort = isset( $payload['sort'] ) ? sanitize_key( (string) $payload['sort'] ) : '';
+		if ( '' !== $sort ) {
+			$analytics['sorts'][ $sort ] = isset( $analytics['sorts'][ $sort ] ) ? absint( $analytics['sorts'][ $sort ] ) + 1 : 1;
+		}
+
+		$analytics['zero_results'] = isset( $analytics['zero_results'] ) ? absint( $analytics['zero_results'] ) : 0;
+		$found = isset( $payload['foundPosts'] ) ? absint( $payload['foundPosts'] ) : 0;
+		if ( 0 === $found ) {
+			$analytics['zero_results']++;
+		}
+
+		$analytics['in_stock_only'] = isset( $analytics['in_stock_only'] ) ? absint( $analytics['in_stock_only'] ) : 0;
+		if ( ! empty( $payload['inStockOnly'] ) ) {
+			$analytics['in_stock_only']++;
+		}
+
+		$analytics['taxonomy_terms'] = isset( $analytics['taxonomy_terms'] ) && is_array( $analytics['taxonomy_terms'] ) ? $analytics['taxonomy_terms'] : array();
+		$tax_filters = isset( $payload['taxFilters'] ) && is_array( $payload['taxFilters'] ) ? $payload['taxFilters'] : array();
+		foreach ( $tax_filters as $taxonomy => $ids ) {
+			$taxonomy = sanitize_key( (string) $taxonomy );
+			if ( '' === $taxonomy || ! is_array( $ids ) ) {
+				continue;
+			}
+			foreach ( $ids as $id ) {
+				$key = $taxonomy . ':' . absint( $id );
+				$analytics['taxonomy_terms'][ $key ] = isset( $analytics['taxonomy_terms'][ $key ] ) ? absint( $analytics['taxonomy_terms'][ $key ] ) + 1 : 1;
+			}
+		}
+
+		$analytics['taxonomy_terms'] = $this->cap_map( $analytics['taxonomy_terms'], 300 );
+		$analytics['collections'] = $this->cap_map( $analytics['collections'], 100 );
+		$analytics['sorts'] = $this->cap_map( $analytics['sorts'], 50 );
+		update_option( 'wbwan_filter_analytics', $analytics, false );
+
+		return new \WP_REST_Response( array( 'tracked' => true ) );
+	}
+
+	/**
+	 * Limit map size to avoid unbounded option growth.
+	 *
+	 * @param array<string,int> $map Map.
+	 * @param int               $max_items Maximum items.
+	 * @return array<string,int>
+	 */
+	private function cap_map( array $map, int $max_items ): array {
+		arsort( $map );
+		return array_slice( $map, 0, $max_items, true );
 	}
 }

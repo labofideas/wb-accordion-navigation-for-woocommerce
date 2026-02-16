@@ -74,6 +74,9 @@ class Settings {
 			'remember_state'      => 1,
 			'mobile_offcanvas'    => 1,
 			'enable_ajax_filtering' => 0,
+			'enable_ajax_sorting' => 1,
+			'filter_logic'        => 'and',
+			'enable_filter_analytics' => 1,
 			'inject_shop_sidebar' => 0,
 			'cache_ttl'           => 15,
 			'menu_id'             => 0,
@@ -225,8 +228,13 @@ class Settings {
 			$clean['style_preset'] = (string) $defaults['style_preset'];
 		}
 
-		foreach ( array( 'show_counts', 'hide_empty', 'auto_expand_current', 'enable_search', 'remember_state', 'mobile_offcanvas', 'enable_ajax_filtering', 'inject_shop_sidebar' ) as $bool_key ) {
+		foreach ( array( 'show_counts', 'hide_empty', 'auto_expand_current', 'enable_search', 'remember_state', 'mobile_offcanvas', 'enable_ajax_filtering', 'enable_ajax_sorting', 'enable_filter_analytics', 'inject_shop_sidebar' ) as $bool_key ) {
 			$clean[ $bool_key ] = isset( $input[ $bool_key ] ) ? 1 : 0;
+		}
+
+		$clean['filter_logic'] = isset( $input['filter_logic'] ) ? sanitize_key( (string) $input['filter_logic'] ) : (string) $defaults['filter_logic'];
+		if ( ! in_array( $clean['filter_logic'], array( 'and', 'or' ), true ) ) {
+			$clean['filter_logic'] = (string) $defaults['filter_logic'];
 		}
 
 		return $clean;
@@ -321,6 +329,8 @@ class Settings {
 							$this->render_modern_toggle( 'remember_state', __( 'Remember open accordion state', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							$this->render_modern_toggle( 'mobile_offcanvas', __( 'Enable mobile off-canvas mode', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							$this->render_modern_toggle( 'enable_ajax_filtering', __( 'Enable AJAX filtering mode (shop/product archives)', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'enable_ajax_sorting', __( 'Enable AJAX sorting', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'enable_filter_analytics', __( 'Enable filter analytics tracking', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							?>
 					</div>
 
@@ -362,6 +372,12 @@ class Settings {
 							name="<?php echo esc_attr( self::OPTION_KEY ); ?>[cache_ttl]"
 							value="<?php echo esc_attr( (string) max( 1, absint( $settings['cache_ttl'] ) ) ); ?>"
 							/>
+
+							<label class="wbwan-label" for="wbwan-filter-logic"><?php esc_html_e( 'Taxonomy filter logic', 'wb-accordion-navigation-for-woocommerce' ); ?></label>
+							<select id="wbwan-filter-logic" class="wbwan-input" name="<?php echo esc_attr( self::OPTION_KEY ); ?>[filter_logic]">
+								<option value="and" <?php selected( (string) $settings['filter_logic'], 'and' ); ?>><?php esc_html_e( 'AND (match all selected terms)', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+								<option value="or" <?php selected( (string) $settings['filter_logic'], 'or' ); ?>><?php esc_html_e( 'OR (match any selected term)', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+							</select>
 						</div>
 
 						<div class="wbwan-card wbwan-preview-card">
