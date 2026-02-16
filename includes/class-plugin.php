@@ -14,6 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once WBWAN_PATH . 'includes/class-settings.php';
 require_once WBWAN_PATH . 'includes/class-frontend.php';
 require_once WBWAN_PATH . 'includes/class-addon-manager.php';
+require_once WBWAN_PATH . 'includes/class-block.php';
 
 class Plugin {
 	/**
@@ -54,6 +55,7 @@ class Plugin {
 
 		new Settings();
 		new Frontend();
+		new Block();
 	}
 
 	/**

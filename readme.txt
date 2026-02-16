@@ -23,6 +23,7 @@ Features:
 * Style presets: Minimal, Bold, Glass.
 * Live preview in admin settings.
 * Import/export settings as JSON.
+* Native Gutenberg block: `WB Accordion Navigation for WooCommerce`.
 * Auto-expand current taxonomy path.
 * Optional mobile off-canvas panel.
 * Configurable taxonomy cache TTL from settings.
