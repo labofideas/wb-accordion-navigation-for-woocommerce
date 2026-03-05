@@ -71,6 +71,49 @@
   margin: -2px 0 12px;
 }
 
+.wbwan-search-suggest {
+  background: #fff;
+  border: 1px solid var(--wbwan-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 20px rgba(23, 31, 56, 0.1);
+  display: grid;
+  gap: 2px;
+  margin: -4px 0 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.wbwan-suggest-item {
+  align-items: flex-start;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--wbwan-text);
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: 8px 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.wbwan-suggest-item:hover,
+.wbwan-suggest-item.is-active {
+  background: #eaf2ff;
+}
+
+.wbwan-suggest-label {
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.wbwan-suggest-section {
+  color: var(--wbwan-muted);
+  font-size: 0.72rem;
+}
+
 .wbwan-clear-filters {
   background: linear-gradient(180deg, #ffffff, #eef4ff);
   border: 1px solid var(--wbwan-border);
@@ -135,6 +178,56 @@
 
 .wbwan-section + .wbwan-section {
   margin-top: 10px;
+}
+
+.wbwan-layout-horizontal_tabs .wbwan-section-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+
+.wbwan-layout-horizontal_tabs .wbwan-section-tab {
+  background: #fff;
+  border: 1px solid var(--wbwan-border);
+  border-radius: 999px;
+  color: var(--wbwan-text);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.wbwan-layout-horizontal_tabs .wbwan-section-tab.is-active {
+  background: #deecff;
+  border-color: #b8d6fb;
+  color: #1d65c9;
+}
+
+.wbwan-layout-horizontal_tabs .wbwan-section.is-tab-hidden {
+  display: none;
+}
+
+.wbwan-layout-horizontal_tabs .wbwan-section-title {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .wbwan-layout-horizontal_tabs .wbwan-section-tabs {
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 2px;
+  }
+
+  .wbwan-layout-horizontal_tabs .wbwan-section-tab {
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 6px 10px;
+  }
 }
 
 .wbwan-section-title {
@@ -240,6 +333,7 @@
 }
 
 .wbwan-item.is-hidden,
+.wbwan-search-suggest.is-hidden,
 .wbwan-search-empty.is-hidden,
 .wbwan-clear-filters.is-hidden {
   display: none;

@@ -39,7 +39,20 @@ test.describe('WBWAN frontend', () => {
 		const sort = page.locator('select[data-wbwan="sort"]').first();
 		await expect(sort).toBeVisible();
 		const analyticsEnabled = await page.evaluate(() => {
-			return !!(window.wbwanSettings && window.wbwanSettings.analyticsEnabled);
+			const root = document.querySelector('[data-wbwan="accordion"]');
+			if (!root) {
+				return false;
+			}
+			const raw = root.getAttribute('data-wbwan-config');
+			if (!raw) {
+				return false;
+			}
+			try {
+				const parsed = JSON.parse(raw);
+				return !!(parsed && parsed.analyticsEnabled);
+			} catch (e) {
+				return false;
+			}
 		});
 
 		const analyticsRequestPromise = analyticsEnabled
@@ -60,6 +73,27 @@ test.describe('WBWAN frontend', () => {
 			const body = analyticsRequest.postDataJSON();
 			expect(body.sort).toBe('price_desc');
 		}
+	});
+
+	test('ajax filtering recovers after zero-result response', async ({ page }) => {
+		await page.goto('/shop-navigation-demo/');
+
+		const minPrice = page.locator('input[data-wbwan="min-price"]').first();
+		await expect(minPrice).toBeVisible();
+
+		const zeroResultPromise = page.waitForResponse((response) => {
+			return response.url().includes('/wp-json/wbwan/v1/filter') && response.status() === 200;
+		});
+		await minPrice.fill('99999999');
+		await zeroResultPromise;
+		await expect(page.locator('.woocommerce-info')).toContainText(/No products found/i);
+
+		const restoreResultPromise = page.waitForResponse((response) => {
+			return response.url().includes('/wp-json/wbwan/v1/filter') && response.status() === 200;
+		});
+		await minPrice.fill('');
+		await restoreResultPromise;
+		await expect(page.locator('ul.products').first()).toBeVisible();
 	});
 });
 

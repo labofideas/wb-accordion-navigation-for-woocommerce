@@ -61,29 +61,32 @@ class Settings {
 	 *
 	 * @return array<string,mixed>
 	 */
-	public static function defaults(): array {
-		$defaults = array(
-			'taxonomies'          => array( 'product_cat' ),
-			'collections'         => array( 'best_sellers', 'on_sale' ),
-			'default_title'       => __( 'Shop Navigation', 'wb-accordion-navigation-for-woocommerce' ),
-			'style_preset'        => 'minimal',
-			'show_counts'         => 1,
-			'hide_empty'          => 1,
-			'auto_expand_current' => 1,
-			'enable_search'       => 1,
-			'remember_state'      => 1,
-			'mobile_offcanvas'    => 1,
-			'enable_ajax_filtering' => 0,
-			'enable_ajax_sorting' => 1,
-			'filter_logic'        => 'and',
-			'enable_filter_analytics' => 1,
-			'inject_shop_sidebar' => 0,
-			'cache_ttl'           => 15,
-			'menu_id'             => 0,
-		);
+		public static function defaults(): array {
+			$defaults = array(
+				'taxonomies'          => array( 'product_cat' ),
+				'collections'         => array( 'best_sellers', 'on_sale' ),
+				'default_title'       => __( 'Shop Navigation', 'wb-accordion-navigation-for-woocommerce' ),
+				'style_preset'        => 'minimal',
+				'navigation_layout'   => 'vertical',
+				'default_open_tab'    => 'first',
+				'show_counts'         => 1,
+				'hide_empty'          => 1,
+				'auto_expand_current' => 1,
+				'enable_search'       => 1,
+				'enable_autosuggest'  => 1,
+				'remember_state'      => 1,
+				'mobile_offcanvas'    => 1,
+				'enable_ajax_filtering' => 0,
+				'enable_ajax_sorting' => 1,
+				'filter_logic'        => 'and',
+				'enable_filter_analytics' => 1,
+				'inject_shop_sidebar' => 0,
+				'cache_ttl'           => 15,
+				'menu_id'             => 0,
+			);
 
-		return apply_filters( 'wbwan_default_settings', $defaults );
-	}
+			return apply_filters( 'wbwan_default_settings', $defaults );
+		}
 
 	/**
 	 * Get merged settings.
@@ -168,11 +171,12 @@ class Settings {
 			'wbwan-settings'
 		);
 
-		$this->register_toggle_field( 'show_counts', esc_html__( 'Show product counts', 'wb-accordion-navigation-for-woocommerce' ) );
-		$this->register_toggle_field( 'hide_empty', esc_html__( 'Hide empty terms', 'wb-accordion-navigation-for-woocommerce' ) );
-		$this->register_toggle_field( 'auto_expand_current', esc_html__( 'Auto-expand current term path', 'wb-accordion-navigation-for-woocommerce' ) );
-		$this->register_toggle_field( 'enable_search', esc_html__( 'Enable search within accordion', 'wb-accordion-navigation-for-woocommerce' ) );
-		$this->register_toggle_field( 'remember_state', esc_html__( 'Remember open accordion state', 'wb-accordion-navigation-for-woocommerce' ) );
+			$this->register_toggle_field( 'show_counts', esc_html__( 'Show product counts', 'wb-accordion-navigation-for-woocommerce' ) );
+			$this->register_toggle_field( 'hide_empty', esc_html__( 'Hide empty terms', 'wb-accordion-navigation-for-woocommerce' ) );
+			$this->register_toggle_field( 'auto_expand_current', esc_html__( 'Auto-expand current term path', 'wb-accordion-navigation-for-woocommerce' ) );
+			$this->register_toggle_field( 'enable_search', esc_html__( 'Enable search within accordion', 'wb-accordion-navigation-for-woocommerce' ) );
+			$this->register_toggle_field( 'enable_autosuggest', esc_html__( 'Enable search autosuggest', 'wb-accordion-navigation-for-woocommerce' ) );
+			$this->register_toggle_field( 'remember_state', esc_html__( 'Remember open accordion state', 'wb-accordion-navigation-for-woocommerce' ) );
 		$this->register_toggle_field( 'mobile_offcanvas', esc_html__( 'Enable mobile off-canvas mode', 'wb-accordion-navigation-for-woocommerce' ) );
 		$this->register_toggle_field( 'inject_shop_sidebar', esc_html__( 'Auto-inject into WooCommerce sidebar', 'wb-accordion-navigation-for-woocommerce' ) );
 
@@ -223,14 +227,22 @@ class Settings {
 		$clean['menu_id'] = isset( $input['menu_id'] ) ? absint( $input['menu_id'] ) : 0;
 		$clean['default_title'] = isset( $input['default_title'] ) ? sanitize_text_field( wp_unslash( (string) $input['default_title'] ) ) : (string) $defaults['default_title'];
 		$clean['cache_ttl'] = isset( $input['cache_ttl'] ) ? max( 1, min( 1440, absint( $input['cache_ttl'] ) ) ) : (int) $defaults['cache_ttl'];
-		$clean['style_preset'] = isset( $input['style_preset'] ) ? sanitize_key( $input['style_preset'] ) : (string) $defaults['style_preset'];
-		if ( ! in_array( $clean['style_preset'], array( 'minimal', 'bold', 'glass' ), true ) ) {
-			$clean['style_preset'] = (string) $defaults['style_preset'];
-		}
+			$clean['style_preset'] = isset( $input['style_preset'] ) ? sanitize_key( $input['style_preset'] ) : (string) $defaults['style_preset'];
+			if ( ! in_array( $clean['style_preset'], array( 'minimal', 'bold', 'glass' ), true ) ) {
+				$clean['style_preset'] = (string) $defaults['style_preset'];
+			}
+			$clean['navigation_layout'] = isset( $input['navigation_layout'] ) ? sanitize_key( $input['navigation_layout'] ) : (string) $defaults['navigation_layout'];
+			if ( ! in_array( $clean['navigation_layout'], array( 'vertical', 'horizontal_tabs' ), true ) ) {
+				$clean['navigation_layout'] = (string) $defaults['navigation_layout'];
+			}
+			$clean['default_open_tab'] = isset( $input['default_open_tab'] ) ? sanitize_key( $input['default_open_tab'] ) : (string) $defaults['default_open_tab'];
+			if ( ! in_array( $clean['default_open_tab'], array( 'first', 'none' ), true ) ) {
+				$clean['default_open_tab'] = (string) $defaults['default_open_tab'];
+			}
 
-		foreach ( array( 'show_counts', 'hide_empty', 'auto_expand_current', 'enable_search', 'remember_state', 'mobile_offcanvas', 'enable_ajax_filtering', 'enable_ajax_sorting', 'enable_filter_analytics', 'inject_shop_sidebar' ) as $bool_key ) {
-			$clean[ $bool_key ] = isset( $input[ $bool_key ] ) ? 1 : 0;
-		}
+			foreach ( array( 'show_counts', 'hide_empty', 'auto_expand_current', 'enable_search', 'enable_autosuggest', 'remember_state', 'mobile_offcanvas', 'enable_ajax_filtering', 'enable_ajax_sorting', 'enable_filter_analytics', 'inject_shop_sidebar' ) as $bool_key ) {
+				$clean[ $bool_key ] = isset( $input[ $bool_key ] ) ? 1 : 0;
+			}
 
 		$clean['filter_logic'] = isset( $input['filter_logic'] ) ? sanitize_key( (string) $input['filter_logic'] ) : (string) $defaults['filter_logic'];
 		if ( ! in_array( $clean['filter_logic'], array( 'and', 'or' ), true ) ) {
@@ -323,10 +335,11 @@ class Settings {
 						<h2><?php esc_html_e( 'Display & UX', 'wb-accordion-navigation-for-woocommerce' ); ?></h2>
 						<p class="wbwan-card-desc"><?php esc_html_e( 'Control how users interact with your accordion.', 'wb-accordion-navigation-for-woocommerce' ); ?></p>
 						<?php
-						$this->render_modern_toggle( 'show_counts', __( 'Show product counts', 'wb-accordion-navigation-for-woocommerce' ), $settings );
-						$this->render_modern_toggle( 'hide_empty', __( 'Hide empty terms', 'wb-accordion-navigation-for-woocommerce' ), $settings );
-						$this->render_modern_toggle( 'auto_expand_current', __( 'Auto-expand current term path', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'show_counts', __( 'Show product counts', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'hide_empty', __( 'Hide empty terms', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'auto_expand_current', __( 'Auto-expand current term path', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							$this->render_modern_toggle( 'enable_search', __( 'Enable search within accordion', 'wb-accordion-navigation-for-woocommerce' ), $settings );
+							$this->render_modern_toggle( 'enable_autosuggest', __( 'Enable search autosuggest', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							$this->render_modern_toggle( 'remember_state', __( 'Remember open accordion state', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							$this->render_modern_toggle( 'mobile_offcanvas', __( 'Enable mobile off-canvas mode', 'wb-accordion-navigation-for-woocommerce' ), $settings );
 							$this->render_modern_toggle( 'enable_ajax_filtering', __( 'Enable AJAX filtering mode (shop/product archives)', 'wb-accordion-navigation-for-woocommerce' ), $settings );
@@ -351,6 +364,24 @@ class Settings {
 								<option value="minimal" <?php selected( (string) $settings['style_preset'], 'minimal' ); ?>><?php esc_html_e( 'Minimal', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
 								<option value="bold" <?php selected( (string) $settings['style_preset'], 'bold' ); ?>><?php esc_html_e( 'Bold', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
 								<option value="glass" <?php selected( (string) $settings['style_preset'], 'glass' ); ?>><?php esc_html_e( 'Glass', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+							</select>
+							<label class="wbwan-label" for="wbwan-navigation-layout"><?php esc_html_e( 'Navigation layout', 'wb-accordion-navigation-for-woocommerce' ); ?></label>
+							<select
+								id="wbwan-navigation-layout"
+								class="wbwan-input"
+								name="<?php echo esc_attr( self::OPTION_KEY ); ?>[navigation_layout]"
+							>
+								<option value="vertical" <?php selected( (string) $settings['navigation_layout'], 'vertical' ); ?>><?php esc_html_e( 'Vertical Accordion', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+								<option value="horizontal_tabs" <?php selected( (string) $settings['navigation_layout'], 'horizontal_tabs' ); ?>><?php esc_html_e( 'Horizontal Collapse Tabs', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+							</select>
+							<label class="wbwan-label" for="wbwan-default-open-tab"><?php esc_html_e( 'Default open tab', 'wb-accordion-navigation-for-woocommerce' ); ?></label>
+							<select
+								id="wbwan-default-open-tab"
+								class="wbwan-input"
+								name="<?php echo esc_attr( self::OPTION_KEY ); ?>[default_open_tab]"
+							>
+								<option value="first" <?php selected( (string) $settings['default_open_tab'], 'first' ); ?>><?php esc_html_e( 'First tab', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
+								<option value="none" <?php selected( (string) $settings['default_open_tab'], 'none' ); ?>><?php esc_html_e( 'None (collapsed)', 'wb-accordion-navigation-for-woocommerce' ); ?></option>
 							</select>
 
 							<label class="wbwan-label" for="wbwan-default-title"><?php esc_html_e( 'Default accordion title', 'wb-accordion-navigation-for-woocommerce' ); ?></label>

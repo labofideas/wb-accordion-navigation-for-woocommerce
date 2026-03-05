@@ -64,24 +64,218 @@ class Frontend {
 	 * Register REST routes.
 	 */
 	public function register_rest_routes(): void {
+		$namespace = apply_filters( 'wbwan_rest_namespace', 'wbwan/v1' );
+		$namespace = is_string( $namespace ) && '' !== $namespace ? trim( $namespace, '/' ) : 'wbwan/v1';
+
+		$filter_route = apply_filters( 'wbwan_filter_route_path', '/filter' );
+		$filter_route = is_string( $filter_route ) && '' !== $filter_route ? $filter_route : '/filter';
+
+		$analytics_route = apply_filters( 'wbwan_analytics_route_path', '/analytics' );
+		$analytics_route = is_string( $analytics_route ) && '' !== $analytics_route ? $analytics_route : '/analytics';
+
 		register_rest_route(
-			'wbwan/v1',
-			'/filter',
+			$namespace,
+			$filter_route,
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
-				'permission_callback' => '__return_true',
+				'permission_callback' => array( $this, 'filter_route_permission' ),
 				'callback'            => array( $this, 'handle_filter_request' ),
+				'args'                => $this->get_filter_route_args(),
 			)
 		);
 
 		register_rest_route(
-			'wbwan/v1',
-			'/analytics',
+			$namespace,
+			$analytics_route,
 			array(
 				'methods'             => \WP_REST_Server::CREATABLE,
-				'permission_callback' => '__return_true',
+				'permission_callback' => array( $this, 'analytics_route_permission' ),
 				'callback'            => array( $this, 'handle_analytics_request' ),
+				'args'                => $this->get_analytics_route_args(),
 			)
+		);
+	}
+
+	/**
+	 * Permission callback for read-only filter endpoint.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return bool|\WP_Error
+	 */
+	public function filter_route_permission( \WP_REST_Request $request ) {
+		$allowed = apply_filters( 'wbwan_rest_filter_permission', true, $request );
+		if ( true === $allowed ) {
+			return true;
+		}
+
+		if ( is_wp_error( $allowed ) ) {
+			return $allowed;
+		}
+
+		return new \WP_Error(
+			'wbwan_rest_filter_forbidden',
+			__( 'You are not allowed to access this endpoint.', 'wb-accordion-navigation-for-woocommerce' ),
+			array( 'status' => rest_authorization_required_code() )
+		);
+	}
+
+	/**
+	 * Permission callback for analytics endpoint.
+	 *
+	 * Default behavior: logged-in users with valid REST nonce.
+	 * Integrators can allow anonymous tracking via `wbwan_allow_public_analytics`.
+	 *
+	 * @param \WP_REST_Request $request REST request.
+	 * @return bool|\WP_Error
+	 */
+	public function analytics_route_permission( \WP_REST_Request $request ) {
+		$allow_public = apply_filters( 'wbwan_allow_public_analytics', false, $request );
+		if ( true === $allow_public ) {
+			return true;
+		}
+
+		if ( ! is_user_logged_in() || ! current_user_can( 'read' ) ) {
+			return new \WP_Error(
+				'wbwan_rest_analytics_forbidden',
+				__( 'Authentication is required for analytics tracking.', 'wb-accordion-navigation-for-woocommerce' ),
+				array( 'status' => rest_authorization_required_code() )
+			);
+		}
+
+		$nonce = (string) $request->get_header( 'X-WP-Nonce' );
+		if ( '' === $nonce ) {
+			$nonce = sanitize_text_field( (string) $request->get_param( '_wpnonce' ) );
+		}
+
+		if ( '' === $nonce || ! wp_verify_nonce( $nonce, 'wp_rest' ) ) {
+			return new \WP_Error(
+				'wbwan_rest_analytics_nonce',
+				__( 'Invalid REST nonce for analytics request.', 'wb-accordion-navigation-for-woocommerce' ),
+				array( 'status' => 403 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Validate tax param shape.
+	 *
+	 * @param mixed            $value   Route param value.
+	 * @param \WP_REST_Request $request REST request.
+	 * @param string           $param   Param name.
+	 * @return bool|\WP_Error
+	 */
+	public function validate_tax_filter_param( $value, \WP_REST_Request $request, string $param ) {
+		unset( $request, $param );
+		if ( null === $value ) {
+			return true;
+		}
+
+		if ( ! is_array( $value ) ) {
+			return new \WP_Error(
+				'wbwan_rest_invalid_tax_filter',
+				__( 'Taxonomy filters must be an object-like array.', 'wb-accordion-navigation-for-woocommerce' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Build filter endpoint args schema.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function get_filter_route_args(): array {
+		$collections = array_keys( Settings::available_collections() );
+		$sort_keys   = array( 'default', 'date_desc', 'price_asc', 'price_desc', 'popularity', 'rating' );
+		$sort_keys   = apply_filters( 'wbwan_allowed_sort_keys', $sort_keys );
+		if ( ! is_array( $sort_keys ) || empty( $sort_keys ) ) {
+			$sort_keys = array( 'default' );
+		}
+		$sort_keys = array_values(
+			array_unique(
+				array_filter(
+					array_map( 'sanitize_key', $sort_keys )
+				)
+			)
+		);
+
+		return array(
+			'tax'        => array(
+				'description'       => __( 'Taxonomy term filters map.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'object',
+				'validate_callback' => array( $this, 'validate_tax_filter_param' ),
+			),
+			'collection' => array(
+				'description'       => __( 'Collection key to filter products.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_key',
+				'enum'              => $collections,
+			),
+			'paged'      => array(
+				'description'       => __( 'Results page number.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'integer',
+				'default'           => 1,
+				'sanitize_callback' => 'absint',
+				'validate_callback' => static function ( $value ): bool {
+					return absint( $value ) >= 1;
+				},
+			),
+			'min_price'  => array(
+				'description'       => __( 'Minimum price.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'integer',
+				'sanitize_callback' => 'absint',
+			),
+			'max_price'  => array(
+				'description'       => __( 'Maximum price.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'integer',
+				'sanitize_callback' => 'absint',
+			),
+			'in_stock'   => array(
+				'description'       => __( 'Limit to in-stock products.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+			),
+			'sort'       => array(
+				'description'       => __( 'Sort key.', 'wb-accordion-navigation-for-woocommerce' ),
+				'type'              => 'string',
+				'default'           => 'default',
+				'sanitize_callback' => 'sanitize_key',
+				'enum'              => $sort_keys,
+			),
+		);
+	}
+
+	/**
+	 * Build analytics endpoint args schema.
+	 *
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function get_analytics_route_args(): array {
+		return array(
+			'taxFilters'  => array(
+				'type'              => 'object',
+				'validate_callback' => array( $this, 'validate_tax_filter_param' ),
+			),
+			'collection'  => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_key',
+			),
+			'sort'        => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_key',
+			),
+			'foundPosts'  => array(
+				'type'              => 'integer',
+				'sanitize_callback' => 'absint',
+			),
+			'inStockOnly' => array(
+				'type'              => 'boolean',
+				'sanitize_callback' => 'rest_sanitize_boolean',
+			),
 		);
 	}
 
@@ -94,7 +288,41 @@ class Frontend {
 			return;
 		}
 
-		echo $this->render_accordion( $settings ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		$accordion = $this->render_accordion( $settings );
+		if ( '' === $accordion ) {
+			return;
+		}
+
+		/*
+		 * Storefront removes WooCommerce's default sidebar callback from the
+		 * `woocommerce_sidebar` hook. In that case this hook still fires, but
+		 * raw output is no longer wrapped in sidebar markup and can overlap loop UI.
+		 */
+		if ( $this->is_storefront_theme() && ! has_action( 'woocommerce_sidebar', 'woocommerce_get_sidebar' ) ) {
+			echo '<aside id="secondary" class="widget-area" role="complementary"><section class="widget wbwan-widget wbwan-widget--shop-sidebar">';
+			echo $accordion; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			echo '</section></aside>';
+			return;
+		}
+
+		echo $accordion; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Check whether current active theme is Storefront (child themes included).
+	 *
+	 * @return bool
+	 */
+	private function is_storefront_theme(): bool {
+		$theme = wp_get_theme();
+		if ( ! $theme instanceof \WP_Theme ) {
+			return false;
+		}
+
+		$stylesheet = strtolower( (string) $theme->get_stylesheet() );
+		$template   = strtolower( (string) $theme->get_template() );
+
+		return 'storefront' === $stylesheet || 'storefront' === $template;
 	}
 
 	/**
@@ -180,32 +408,54 @@ class Frontend {
 		wp_enqueue_style( 'wbwan-frontend' );
 		wp_enqueue_script( 'wbwan-frontend' );
 
-		wp_localize_script(
-			'wbwan-frontend',
-			'wbwanSettings',
-			array(
-				'rememberState' => ! empty( $settings['remember_state'] ),
-				'ajaxFiltering' => ! empty( $settings['enable_ajax_filtering'] ),
-				'ajaxSorting'   => ! empty( $settings['enable_ajax_sorting'] ),
-				'analyticsEnabled' => ! empty( $settings['enable_filter_analytics'] ),
-				'restUrl'       => esc_url_raw( rest_url( 'wbwan/v1/filter' ) ),
-				'analyticsUrl'  => esc_url_raw( rest_url( 'wbwan/v1/analytics' ) ),
-			)
-		);
+			$rest_namespace = apply_filters( 'wbwan_rest_namespace', 'wbwan/v1' );
+			$rest_namespace = is_string( $rest_namespace ) && '' !== $rest_namespace ? trim( $rest_namespace, '/' ) : 'wbwan/v1';
+			$rest_filter_path = apply_filters( 'wbwan_filter_route_path', '/filter' );
+			$rest_filter_path = is_string( $rest_filter_path ) && '' !== $rest_filter_path ? $rest_filter_path : '/filter';
+			$rest_analytics_path = apply_filters( 'wbwan_analytics_route_path', '/analytics' );
+			$rest_analytics_path = is_string( $rest_analytics_path ) && '' !== $rest_analytics_path ? $rest_analytics_path : '/analytics';
 
-		$wrapper_classes = array( 'wbwan-accordion' );
-		$style_preset = isset( $settings['style_preset'] ) ? sanitize_key( (string) $settings['style_preset'] ) : 'minimal';
-		if ( ! in_array( $style_preset, array( 'minimal', 'bold', 'glass' ), true ) ) {
-			$style_preset = 'minimal';
-		}
-		$wrapper_classes[] = 'wbwan-style-' . $style_preset;
-		if ( ! empty( $settings['mobile_offcanvas'] ) ) {
-			$wrapper_classes[] = 'is-mobile-offcanvas';
-		}
+			$wrapper_classes = array( 'wbwan-accordion' );
+			$style_preset = isset( $settings['style_preset'] ) ? sanitize_key( (string) $settings['style_preset'] ) : 'minimal';
+			if ( ! in_array( $style_preset, array( 'minimal', 'bold', 'glass' ), true ) ) {
+				$style_preset = 'minimal';
+			}
+			$layout = isset( $settings['navigation_layout'] ) ? sanitize_key( (string) $settings['navigation_layout'] ) : 'vertical';
+			if ( ! in_array( $layout, array( 'vertical', 'horizontal_tabs' ), true ) ) {
+				$layout = 'vertical';
+			}
+			$wrapper_classes[] = 'wbwan-style-' . $style_preset;
+			$wrapper_classes[] = 'wbwan-layout-' . $layout;
+			if ( ! empty( $settings['mobile_offcanvas'] ) ) {
+				$wrapper_classes[] = 'is-mobile-offcanvas';
+			}
+			$wrapper_classes = apply_filters( 'wbwan_wrapper_classes', $wrapper_classes, $settings, $title );
+			if ( ! is_array( $wrapper_classes ) ) {
+				$wrapper_classes = array( 'wbwan-accordion' );
+			}
+
+			$instance_config = array(
+				'rememberState'      => ! empty( $settings['remember_state'] ),
+				'ajaxFiltering'      => ! empty( $settings['enable_ajax_filtering'] ),
+				'ajaxSorting'        => ! empty( $settings['enable_ajax_sorting'] ),
+				'autosuggestEnabled' => ! empty( $settings['enable_autosuggest'] ),
+				'defaultOpenTab'     => isset( $settings['default_open_tab'] ) ? sanitize_key( (string) $settings['default_open_tab'] ) : 'first',
+				'analyticsEnabled'   => ! empty( $settings['enable_filter_analytics'] ),
+				'restUrl'            => esc_url_raw( rest_url( $rest_namespace . $rest_filter_path ) ),
+				'analyticsUrl'       => esc_url_raw( rest_url( $rest_namespace . $rest_analytics_path ) ),
+				'restNonce'          => wp_create_nonce( 'wp_rest' ),
+			);
+			$instance_config = apply_filters( 'wbwan_frontend_instance_config', $instance_config, $settings, $title );
+			if ( ! is_array( $instance_config ) ) {
+				$instance_config = array();
+			}
+
+			$config_json = wp_json_encode( $instance_config );
+			$config_json = false === $config_json ? '{}' : $config_json;
 
 		ob_start();
 		?>
-		<div class="<?php echo esc_attr( implode( ' ', $wrapper_classes ) ); ?>" data-wbwan="accordion" data-wbwan-ajax="<?php echo ! empty( $settings['enable_ajax_filtering'] ) ? '1' : '0'; ?>">
+			<div class="<?php echo esc_attr( implode( ' ', $wrapper_classes ) ); ?>" data-wbwan="accordion" data-wbwan-ajax="<?php echo ! empty( $settings['enable_ajax_filtering'] ) ? '1' : '0'; ?>" data-wbwan-default-open-tab="<?php echo isset( $settings['default_open_tab'] ) ? esc_attr( sanitize_key( (string) $settings['default_open_tab'] ) ) : 'first'; ?>" data-wbwan-config="<?php echo esc_attr( $config_json ); ?>">
 			<?php do_action( 'wbwan_before_render', $settings ); ?>
 			<?php if ( ! empty( $settings['mobile_offcanvas'] ) ) : ?>
 				<button class="wbwan-mobile-toggle" type="button" data-wbwan="mobile-toggle"><?php esc_html_e( 'Filters', 'wb-accordion-navigation-for-woocommerce' ); ?></button>
@@ -220,7 +470,10 @@ class Frontend {
 				</div>
 
 				<?php if ( ! empty( $settings['enable_search'] ) ) : ?>
-					<input type="search" class="wbwan-search" data-wbwan="search" placeholder="<?php esc_attr_e( 'Search navigation...', 'wb-accordion-navigation-for-woocommerce' ); ?>" />
+					<input type="search" class="wbwan-search" data-wbwan="search" autocomplete="off" placeholder="<?php esc_attr_e( 'Search navigation...', 'wb-accordion-navigation-for-woocommerce' ); ?>" />
+					<?php if ( ! empty( $settings['enable_autosuggest'] ) ) : ?>
+						<div class="wbwan-search-suggest is-hidden" data-wbwan="search-suggest" role="listbox" aria-label="<?php esc_attr_e( 'Search suggestions', 'wb-accordion-navigation-for-woocommerce' ); ?>"></div>
+					<?php endif; ?>
 					<p class="wbwan-search-empty is-hidden" data-wbwan="search-empty"><?php esc_html_e( 'No matching navigation items.', 'wb-accordion-navigation-for-woocommerce' ); ?></p>
 				<?php endif; ?>
 				<?php if ( ! empty( $settings['enable_ajax_filtering'] ) ) : ?>
@@ -717,7 +970,8 @@ class Frontend {
 			$args = array_merge( $args, $sort_args );
 		}
 
-		$query = new \WP_Query( $args );
+			$args = apply_filters( 'wbwan_rest_filter_query_args', $args, $request, $settings );
+			$query = new \WP_Query( $args );
 		ob_start();
 		if ( $query->have_posts() ) {
 			woocommerce_product_loop_start();
@@ -764,16 +1018,17 @@ class Frontend {
 			$pagination_html .= '</ul></nav>';
 		}
 
-		return new \WP_REST_Response(
-			array(
-				'html'       => (string) ob_get_clean(),
-				'foundPosts' => (int) $query->found_posts,
-				'countHtml'  => $count_html,
+			$response_data = array(
+				'html'           => (string) ob_get_clean(),
+				'foundPosts'     => (int) $query->found_posts,
+				'countHtml'      => $count_html,
 				'paginationHtml' => $pagination_html,
-				'sort'       => $sort,
-			)
-		);
-	}
+				'sort'           => $sort,
+			);
+			$response_data = apply_filters( 'wbwan_rest_filter_response', $response_data, $args, $query, $request, $settings );
+
+			return new \WP_REST_Response( is_array( $response_data ) ? $response_data : array() );
+		}
 
 	/**
 	 * Map sort key to query args.
@@ -782,39 +1037,46 @@ class Frontend {
 	 * @return array<string,mixed>
 	 */
 	private function get_sort_query_args( string $sort ): array {
+		$sort_args = array();
 		switch ( $sort ) {
 			case 'date_desc':
-				return array(
+				$sort_args = array(
 					'orderby' => 'date',
 					'order'   => 'DESC',
 				);
+				break;
 			case 'price_asc':
-				return array(
+				$sort_args = array(
 					'meta_key' => '_price', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
 					'orderby'  => 'meta_value_num',
 					'order'    => 'ASC',
 				);
+				break;
 			case 'price_desc':
-				return array(
+				$sort_args = array(
 					'meta_key' => '_price', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
 					'orderby'  => 'meta_value_num',
 					'order'    => 'DESC',
 				);
+				break;
 			case 'popularity':
-				return array(
+				$sort_args = array(
 					'meta_key' => 'total_sales', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
 					'orderby'  => 'meta_value_num',
 					'order'    => 'DESC',
 				);
+				break;
 			case 'rating':
-				return array(
+				$sort_args = array(
 					'meta_key' => '_wc_average_rating', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Optional user-selected sorting.
 					'orderby'  => 'meta_value_num',
 					'order'    => 'DESC',
 				);
+				break;
 		}
 
-		return array();
+		$sort_args = apply_filters( 'wbwan_sort_query_args', $sort_args, $sort );
+		return is_array( $sort_args ) ? $sort_args : array();
 	}
 
 	/**
@@ -829,10 +1091,11 @@ class Frontend {
 			return new \WP_REST_Response( array( 'tracked' => false ) );
 		}
 
-		$payload = $request->get_json_params();
-		if ( ! is_array( $payload ) ) {
-			$payload = array();
-		}
+			$payload = $request->get_json_params();
+			if ( ! is_array( $payload ) ) {
+				$payload = array();
+			}
+			$payload = apply_filters( 'wbwan_analytics_payload', $payload, $request );
 
 		$option = get_option( 'wbwan_filter_analytics', array() );
 		$analytics = is_array( $option ) ? $option : array();
