@@ -50,6 +50,10 @@ class Plugin {
 		add_action( 'admin_notices', array( $this, 'maybe_show_wc_notice' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WBWAN_FILE ), array( $this, 'plugin_action_links' ) );
 
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			return;
+		}
+
 		$this->addon_manager = new Addon_Manager();
 		add_action( 'init', array( $this, 'boot_addons' ), 5 );
 

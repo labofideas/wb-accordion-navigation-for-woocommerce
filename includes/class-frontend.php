@@ -35,6 +35,9 @@ class Frontend {
 		add_action( 'pre_get_posts', array( $this, 'apply_collection_query' ) );
 		add_action( 'woocommerce_sidebar', array( $this, 'maybe_inject_into_sidebar' ), 5 );
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+		add_action( 'created_term', array( $this, 'flush_term_transients' ), 10, 3 );
+		add_action( 'edited_term', array( $this, 'flush_term_transients' ), 10, 3 );
+		add_action( 'delete_term', array( $this, 'flush_term_transients' ), 10, 3 );
 	}
 
 	/**
@@ -94,6 +97,19 @@ class Frontend {
 				'args'                => $this->get_analytics_route_args(),
 			)
 		);
+	}
+
+	/**
+	 * Flush term transients for a taxonomy when terms change.
+	 *
+	 * @param int    $term_id  Term ID.
+	 * @param int    $tt_id    Term taxonomy ID.
+	 * @param string $taxonomy Taxonomy slug.
+	 */
+	public function flush_term_transients( int $term_id, int $tt_id, string $taxonomy ): void {
+		delete_transient( 'wbwan_terms_' . md5( $taxonomy . ':0' ) );
+		delete_transient( 'wbwan_terms_' . md5( $taxonomy . ':1' ) );
+		$this->terms_cache = array();
 	}
 
 	/**
@@ -331,7 +347,8 @@ class Frontend {
 	 * @param array<string,string> $atts Shortcode attributes.
 	 * @return string
 	 */
-	public function shortcode( array $atts ): string {
+	public function shortcode( $atts ): string {
+		$atts = is_array( $atts ) ? $atts : array();
 		$settings = Settings::get();
 		$default_title = isset( $settings['default_title'] ) && is_string( $settings['default_title'] ) && '' !== $settings['default_title']
 			? $settings['default_title']
